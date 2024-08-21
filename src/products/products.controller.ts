@@ -3,37 +3,87 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { PRODUCT_SERVICE } from 'src/config';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { catchError, firstValueFrom } from 'rxjs';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @Controller('products')
 export class ProductsController {
-  constructor() {}
+  constructor(
+    @Inject(PRODUCT_SERVICE) private readonly productsClient: ClientProxy,
+  ) {}
 
   @Post()
-  createProduct() {
-    return 'Crea un producto';
+  createProduct(@Body() createProductDto: CreateProductDto) {
+    return this.productsClient.send(
+      { cmd: 'create_product' },
+      createProductDto,
+    );
   }
 
   @Get()
-  findAllProducts() {
-    return 'Esta funcion regresa varios productos';
+  findAllProducts(@Query() paginationDto: PaginationDto) {
+    return this.productsClient.send(
+      { cmd: 'find_all_products' },
+      paginationDto,
+    );
   }
 
   @Get(':id')
-  find(@Param('id') id: string) {
-    return `Esta funcion regresa el producto ${+id}`;
+  async findOne(@Param('id') id: string) {
+    /**
+     *  return this.productsClient.send({ cmd: 'find_one_product' }, { id })
+     *      .pipe(
+     *          catchError(err => {throw new RcpException(err)})
+     *  );
+     */
+    try {
+      const product = await firstValueFrom(
+        this.productsClient.send({ cmd: 'find_one_product' }, { id }).pipe(
+          catchError((err) => {
+            throw new RpcException(err);
+          }),
+        ),
+      );
+
+      return product;
+    } catch (error) {
+      throw new RpcException(error);
+    }
   }
 
   @Delete(':id')
   deleteProduct(@Param('id') id: string) {
-    return `Esta funcion elimina el producto ${+id}`;
+    return this.productsClient.send({ cmd: 'delete_product' }, { id });
   }
 
   @Patch(':id')
-  patchProduct(@Param('id') id: string, @Body() body: any) {
-    return `Esta funcion actualiza el producto ${+id}`;
+  patchProduct(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateProductDto: UpdateProductDto,
+  ) {
+    return this.productsClient
+      .send(
+        { cmd: 'updated_product' },
+        {
+          id,
+          ...updateProductDto,
+        },
+      )
+      .pipe(
+        catchError((err) => {
+          throw new RpcException(err);
+        }),
+      );
   }
 }
