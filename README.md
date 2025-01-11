@@ -17,3 +17,11 @@ docker run -d --name nats-main -p 4222:4222 -p 6222:6222 -p 8222:8222 nats
 
 5. Tener levandado los microservicios
 6. levantar el proyecto con 'npm run start:dev'
+
+---
+
+Si queremos crear la version de produccion
+
+```
+docker build -f dockerfile.prod -t client-gatway .
+```
